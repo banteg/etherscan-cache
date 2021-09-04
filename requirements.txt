@@ -1,0 +1,6 @@
+diskcache
+eth-utils
+fastapi
+requests
+toml
+uvicorn
