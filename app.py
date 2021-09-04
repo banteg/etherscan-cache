@@ -1,5 +1,7 @@
-import math
+from collections import defaultdict
+from functools import wraps
 from itertools import cycle
+from threading import Lock
 
 import diskcache
 import requests
@@ -13,8 +15,22 @@ config = toml.load(open("config.toml"))
 keys = {explorer: cycle(config[explorer]["keys"]) for explorer in config}
 
 
-@diskcache.memoize_stampede(cache, expire=math.inf)
+def stampede(f):
+    locks = defaultdict(Lock)
+
+    @wraps(f)
+    def inner(*args, **kwargs):
+        key = f.__cache_key__(*args, **kwargs)
+        with locks[key]:
+            return f(*args, **kwargs)
+
+    return inner
+
+
+@stampede
+@cache.memoize()
 def get_from_upstream(explorer, module, action, address):
+    print(f"fetching {explorer} {address}")
     resp = requests.get(
         config[explorer]["url"],
         params={

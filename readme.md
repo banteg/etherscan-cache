@@ -9,8 +9,8 @@ Install dependencies
 pip install -r requirements.txt
 ```
 
-Create a `config.toml`, specify upstreams with their corresponding API keys.
-```
+Create a `config.toml`, specify multiple upstreams with their corresponding API keys.
+```toml
 [etherscan]
 url = "https://api.etherscan.io/api"
 keys = [
