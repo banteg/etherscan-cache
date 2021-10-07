@@ -63,6 +63,17 @@ def cached_api(explorer: str, module: str, action: str, address: str):
     return get_from_upstream(explorer, module, action, address)
 
 
+@app.delete("/{explorer}/api")
+def invalidate(explorer: str, address: str):
+    deleted = 0
+
+    for key in cache.iterkeys():
+        if (key[1], key[4]) == (explorer, address):
+            deleted += bool(cache.delete(key))
+    
+    return {'deleted': deleted}
+
+
 @app.get("/stats")
 def cache_stats():
     hits, misses = cache.stats()
