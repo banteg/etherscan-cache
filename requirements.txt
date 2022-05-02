@@ -4,3 +4,4 @@ fastapi
 requests
 toml
 uvicorn
+pycryptodome
