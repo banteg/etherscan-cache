@@ -35,3 +35,10 @@ Front with something like Caddy if you need `https`.
 
 - `/{explorer}/api` forwards to upstream api
 - `/stats` cache stats (hits, misses, count, size)
+
+
+## Docker
+
+After populating the `config.toml` you can build and run the docker container:
+
+`docker-compose up --build --detach`
