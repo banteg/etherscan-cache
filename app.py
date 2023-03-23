@@ -39,6 +39,7 @@ def get_from_upstream(explorer, module, action, address):
             "address": address,
             "apiKey": next(keys[explorer]),
         },
+        headers={ "User-Agent": "Mozilla/5.0" }
     )
     resp.raise_for_status()
     return resp.json()
