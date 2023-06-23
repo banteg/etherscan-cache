@@ -6,6 +6,7 @@ from threading import Lock
 import diskcache
 import requests
 import toml
+from cachetools.func import ttl_cache
 from eth_utils import to_checksum_address
 from fastapi import FastAPI, HTTPException
 
@@ -27,9 +28,8 @@ def stampede(f):
     return inner
 
 
-@stampede
-@cache.memoize()
-def get_from_upstream(explorer, module, action, address):
+@ttl_cache(ttl=60*60)  # Caches api response for one hour, lets us ensure bad responses aren't disk cached
+def weak_cache(explorer, module, action, address):
     print(f"fetching {explorer} {address}")
     resp = requests.get(
         config[explorer]["url"],
@@ -43,6 +43,14 @@ def get_from_upstream(explorer, module, action, address):
     )
     resp.raise_for_status()
     return resp.json()
+    
+    
+@stampede
+@cache.memoize()
+def get_from_upstream(explorer, module, action, address):
+    resp = weak_cache(explorer, module, action, address)
+    # TODO: raise an exception here if the contract isn't verified
+    return resp
 
 
 @app.get("/{explorer}/api")
