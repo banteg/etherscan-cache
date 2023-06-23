@@ -16,6 +16,10 @@ config = toml.load(open("config.toml"))
 keys = {explorer: cycle(config[explorer]["keys"]) for explorer in config}
 
 
+class ContractNotVerified(HTTPException):
+    ...
+
+
 def stampede(f):
     locks = defaultdict(Lock)
 
@@ -49,7 +53,10 @@ def weak_cache(explorer, module, action, address):
 @cache.memoize()
 def get_from_upstream(explorer, module, action, address):
     resp = weak_cache(explorer, module, action, address)
-    # TODO: raise an exception here if the contract isn't verified
+    # NOTE: raise an exception here if the contract isn't verified
+    is_verified = bool(resp["result"][0].get("SourceCode"))
+    if not is_verified:
+        raise ContractNotVerified(404, 'contract source code not verified')
     return resp
 
 
@@ -69,7 +76,10 @@ def cached_api(explorer: str, module: str, action: str, address: str):
     except ValueError:
         raise HTTPException(400, "invalid address")
 
-    return get_from_upstream(explorer, module, action, address)
+    try:
+        return get_from_upstream(explorer, module, action, address)
+    except ContractNotVerified:
+        return weak_cache(explorer, module, action, address)
 
 
 @app.delete("/{explorer}/api")
