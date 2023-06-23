@@ -1,3 +1,4 @@
+cachetools
 diskcache
 eth-utils
 fastapi
