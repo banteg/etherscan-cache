@@ -6,6 +6,7 @@ from threading import Lock
 import diskcache
 import requests
 import toml
+from cachetools.func import ttl_cache
 from eth_utils import to_checksum_address
 from fastapi import FastAPI, HTTPException
 
@@ -13,6 +14,10 @@ app = FastAPI()
 cache = diskcache.Cache("cache", statistics=True, size_limit=10e9)
 config = toml.load(open("config.toml"))
 keys = {explorer: cycle(config[explorer]["keys"]) for explorer in config}
+
+
+class ContractNotVerified(HTTPException):
+    ...
 
 
 def stampede(f):
@@ -27,9 +32,8 @@ def stampede(f):
     return inner
 
 
-@stampede
-@cache.memoize()
-def get_from_upstream(explorer, module, action, address):
+@ttl_cache(ttl=60*60)  # Caches api response for one hour, lets us ensure bad responses aren't disk cached
+def weak_cache(explorer, module, action, address):
     print(f"fetching {explorer} {address}")
     resp = requests.get(
         config[explorer]["url"],
@@ -43,6 +47,17 @@ def get_from_upstream(explorer, module, action, address):
     )
     resp.raise_for_status()
     return resp.json()
+    
+    
+@stampede
+@cache.memoize()
+def get_from_upstream(explorer, module, action, address):
+    resp = weak_cache(explorer, module, action, address)
+    # NOTE: raise an exception here if the contract isn't verified
+    is_verified = bool(resp["result"][0].get("SourceCode"))
+    if not is_verified:
+        raise ContractNotVerified(404, 'contract source code not verified')
+    return resp
 
 
 @app.get("/{explorer}/api")
@@ -61,7 +76,10 @@ def cached_api(explorer: str, module: str, action: str, address: str):
     except ValueError:
         raise HTTPException(400, "invalid address")
 
-    return get_from_upstream(explorer, module, action, address)
+    try:
+        return get_from_upstream(explorer, module, action, address)
+    except ContractNotVerified:
+        return weak_cache(explorer, module, action, address)
 
 
 @app.delete("/{explorer}/api")
