@@ -6,3 +6,4 @@ requests
 toml
 uvicorn
 pycryptodome
+sentry_sdk
