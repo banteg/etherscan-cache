@@ -3,6 +3,7 @@ from functools import wraps
 from itertools import cycle
 from threading import Lock
 
+import os
 import diskcache
 import requests
 import toml
@@ -10,11 +11,15 @@ from cachetools.func import ttl_cache
 from eth_utils import to_checksum_address
 from fastapi import FastAPI, HTTPException
 
+
+if SENTRY_DSN := os.environ.get("SENTRY_DSN"):
+    import sentry_sdk
+    sentry_sdk.init(SENTRY_DSN)
+    
 app = FastAPI()
 cache = diskcache.Cache("cache", statistics=True, size_limit=10e9)
 config = toml.load(open("config.toml"))
 keys = {explorer: cycle(config[explorer]["keys"]) for explorer in config}
-
 
 class ContractNotVerified(HTTPException):
     ...
