@@ -59,7 +59,12 @@ def weak_cache(explorer, module, action, address):
 def get_from_upstream(explorer, module, action, address):
     resp = weak_cache(explorer, module, action, address)
     # NOTE: raise an exception here if the contract isn't verified
-    is_verified = False if resp["result"] == 'Contract source code not verified' else bool(resp["result"][0].get("SourceCode"))
+    if action == "getsourcecode":
+        is_verified = bool(resp["result"][0].get("SourceCode"))
+    elif action == "getabi":
+        is_verified = not resp["result"] == 'Contract source code not verified'
+    else:
+        raise NotImplementedError(action)
     if not is_verified:
         raise ContractNotVerified(404, 'contract source code not verified')
     return resp
