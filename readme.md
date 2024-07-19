@@ -13,6 +13,8 @@ Create a `config.toml`, specify multiple upstreams with their corresponding API 
 ```toml
 [etherscan]
 url = "https://api.etherscan.io/api"
+# optional for on-chain lookups
+# rpc_url = "http://localhost:8545"
 keys = [
     "V53X2WJ37502KMJFXOZB30V0JHNMO11IEO",
     "C6CS0ELHNKQJOL5KUGJVI9UOX3PRECYOZW",
@@ -35,6 +37,7 @@ Front with something like Caddy if you need `https`.
 
 - `/{explorer}/api` forwards to upstream api
 - `/stats` cache stats (hits, misses, count, size)
+- `/{explorer}/constructor_args/{address}` returns the bytecode of the constructor args when the contract was deployed
 
 
 ## Docker

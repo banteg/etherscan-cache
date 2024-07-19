@@ -7,9 +7,12 @@ import os
 import diskcache
 import requests
 import toml
+import json
 from cachetools.func import ttl_cache
 from eth_utils import to_checksum_address
 from fastapi import FastAPI, HTTPException
+from typing import Optional
+from constructor_args import do_on_chain_lookup, get_creation_tx, get_creation_code
 
 
 if SENTRY_DSN := os.environ.get("SENTRY_DSN"):
@@ -113,3 +116,70 @@ def cache_stats():
         "count": count[0],
         "size": cache.volume(),
     }
+
+@app.get("/{explorer}/constructor_args/{address}")
+def constructor_args(
+  explorer: str,
+  address: str,
+  on_chain_lookup: bool=False,
+  creation_tx_hash: Optional[str]=None,
+  bytecode: Optional[str]=None):
+  """
+  Returns the constructor args for a contract provided by ``address``.
+
+  By default, it tries to get the constructor args from the explorer by calling
+  its api.
+
+  For doing on-chain lookups instead, the ``on_chain_lookup`` param can be set to ``True``.
+  On-chain lookup will also be done as a fallback if explorer based lookups fail:
+
+  1. get the creation_code from the creation tx
+  2. compare it with the passed ``bytecode``
+  3. return the last bytes in the diff ``creation_code-bytecode``
+
+  Parameters:
+  ===========
+  :param explorer: the used explorer, e.g. etherscan
+  :param address: the address of the contract
+  :param on_chain_lookup: enables on-chain lookup instead of querying the explorer
+  :param creation_tx_hash: optional hash of the tx when the contract was deployed.
+                           Useful if the provided node can't determine the contract creation tx.
+  :param bytecode: optional hex string of the compiled original source code
+                   Useful if the explorer doesn't return valid constructor args or if they're incorrect.
+
+  :return: a hex string with the constructor args used during deployment of the contract.
+  """
+
+  try:
+      address = to_checksum_address(address)
+  except ValueError:
+      raise HTTPException(400, "invalid address")
+
+  constructor_args = {
+    "address": address,
+  }
+
+  rpc_url = None
+  if "rpc_url" in config[explorer]:
+      rpc_url = config[explorer]["rpc_url"]
+
+  if on_chain_lookup:
+      args = do_on_chain_lookup(explorer, rpc_url, address, creation_tx_hash, bytecode)
+      constructor_args["constructor_args"] = args
+      return constructor_args
+
+  try:
+      res = get_from_upstream(explorer, "contract", "getsourcecode", address)
+  except ContractNotVerified:
+      res = weak_cache(explorer, "contract", "getsourcecode", address)
+  if res["message"] == "OK" and "result" in res:
+      results = res["result"]
+      if len(results) > 0:
+          args = results[0]["ConstructorArguments"]
+
+  if not args:
+    # fallback if explorer api didn't return anything
+    args = do_on_chain_lookup(explorer, rpc_url, address, creation_tx_hash, bytecode)
+
+  constructor_args["constructor_args"] = args
+  return constructor_args
